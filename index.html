@@ -218,7 +218,7 @@
   }
   .empty-state svg{opacity:0.4;}
   .actions{
-    display:flex; gap:10px; width:100%; max-width:520px;
+    display:flex; flex-wrap:wrap; gap:10px; width:100%; max-width:520px;
   }
   .actions button{
     flex:1;
@@ -235,11 +235,11 @@
     color:var(--cream);
   }
   .btn-dl:hover{border-color:var(--gold);}
-  .btn-email{
-    background:transparent;
-    color:var(--gold);
+  .btn-whatsapp{
+    background:#1f7a3f;
+    color:#fbf5e8;
   }
-  .btn-email:hover{background:rgba(238,169,59,0.08);}
+  .btn-whatsapp:hover{filter:brightness(1.1);}
   .status{
     font-size:13px;
     min-height:18px;
@@ -344,7 +344,7 @@
         <canvas id="ticketCanvas" style="display:none;"></canvas>
         <div class="actions" id="ticketActions" style="display:none;">
           <button class="btn-dl" id="btnDownload">⬇ Télécharger le PDF</button>
-          <button class="btn-email" id="btnEmail">✉ Envoyer par email</button>
+          <button class="btn-whatsapp" id="btnWhatsapp">📤 Partager via WhatsApp</button>
         </div>
         <div class="status" id="ticketStatus"></div>
       </div>
@@ -354,10 +354,10 @@
       <h2>Participants inscrits</h2>
       <table id="regTable">
         <thead>
-          <tr><th>N° Ticket</th><th>Nom</th><th>Téléphone</th><th>Email</th><th>Statut PDF</th></tr>
+          <tr><th>N° Ticket</th><th>Nom</th><th>Téléphone</th><th>Email</th></tr>
         </thead>
         <tbody id="regTableBody">
-          <tr><td colspan="5" style="color:rgba(251,245,232,0.35);">Aucune inscription pour le moment.</td></tr>
+          <tr><td colspan="4" style="color:rgba(251,245,232,0.35);">Aucune inscription pour le moment.</td></tr>
         </tbody>
       </table>
     </div>
@@ -397,7 +397,7 @@ function renderTable(){
   const railCount = document.getElementById('railCount');
   railCount.textContent = registrations.length;
   if(registrations.length === 0){
-    body.innerHTML = '<tr><td colspan="5" style="color:rgba(251,245,232,0.35);">Aucune inscription pour le moment.</td></tr>';
+    body.innerHTML = '<tr><td colspan="4" style="color:rgba(251,245,232,0.35);">Aucune inscription pour le moment.</td></tr>';
     return;
   }
   body.innerHTML = registrations.map(r => `
@@ -406,7 +406,6 @@ function renderTable(){
       <td>${r.nom}</td>
       <td>${r.tel}</td>
       <td>${r.email}</td>
-      <td><span class="badge ${r.sent ? 'sent' : 'pending'}">${r.sent ? 'Envoyé' : 'En attente'}</span></td>
     </tr>
   `).join('');
 }
@@ -530,19 +529,47 @@ document.getElementById('btnDownload').addEventListener('click', () => {
   statusEl.className = 'status ok';
 });
 
-document.getElementById('btnEmail').addEventListener('click', () => {
+document.getElementById('btnWhatsapp').addEventListener('click', async () => {
   const reg = window._currentReg;
   const statusEl = document.getElementById('ticketStatus');
   if(!reg) return;
-  statusEl.textContent = "Envoi en cours…";
-  statusEl.className = 'status info';
-  setTimeout(() => {
-    reg.sent = true;
-    renderTable();
-    statusEl.textContent = `Simulation : ticket envoyé à ${reg.email}. (branchement backend requis pour un envoi réel)`;
-    statusEl.className = 'status ok';
-  }, 900);
+
+  const canvas = document.getElementById('ticketCanvas');
+
+  // navigator.share avec fichiers ne marche que sur mobile / navigateurs récents (HTTPS requis).
+  // On le détecte proprement plutôt que de planter silencieusement.
+  canvas.toBlob(async (blob) => {
+    if(!blob){
+      statusEl.textContent = "Impossible de préparer l'image du ticket.";
+      statusEl.className = 'status';
+      return;
+    }
+    const file = new File([blob], `Ticket-${reg.ticketNo}.png`, { type: 'image/png' });
+    const shareData = {
+      files: [file],
+      title: `Ticket Brunch Phénix 57 — ${reg.ticketNo}`,
+      text: `Voici mon ticket pour le Brunch Phénix 57 (${reg.ticketNo}).`
+    };
+
+    if(navigator.canShare && navigator.canShare(shareData)){
+      try{
+        await navigator.share(shareData);
+        statusEl.textContent = "Partagé.";
+        statusEl.className = 'status ok';
+      }catch(err){
+        // L'utilisateur a annulé le partage — ce n'est pas une erreur à afficher en rouge.
+        if(err.name !== 'AbortError'){
+          statusEl.textContent = "Le partage a échoué, essayez le téléchargement.";
+          statusEl.className = 'status';
+        }
+      }
+    } else {
+      statusEl.textContent = "Le partage direct n'est pas disponible sur ce navigateur — téléchargez le PDF puis partagez-le manuellement sur WhatsApp.";
+      statusEl.className = 'status';
+    }
+  }, 'image/png', 1.0);
 });
+
 </script>
 </body>
 </html>
