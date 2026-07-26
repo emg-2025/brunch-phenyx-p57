@@ -39,7 +39,11 @@ async function nextDisplayNumber() {
   const counterRef = db.collection('_counters').doc('brunch-phenix57');
   return db.runTransaction(async (tx) => {
     const doc = await tx.get(counterRef);
-    const current = doc.exists ? doc.data().value : 0;
+    const raw = doc.exists ? doc.data().value : 0;
+    // Filet de sécurité : si la valeur stockée n'est pas un nombre valide
+    // (champ corrompu, créé manuellement dans la console sans valeur, etc.),
+    // on repart de 0 plutôt que de propager NaN indéfiniment.
+    const current = (typeof raw === 'number' && Number.isFinite(raw)) ? raw : 0;
     const next = current + 1;
     tx.set(counterRef, { value: next }, { merge: true });
     return next;
