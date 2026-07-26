@@ -125,13 +125,23 @@ async function verifyRaw(raw){
   }
 }
 
-const scanner = new Html5Qrcode("reader");
+const scanner = new Html5Qrcode("reader", {
+  // Utilise le détecteur de QR natif du téléphone quand le navigateur le
+  // supporte (Chrome Android notamment) — nettement plus rapide que la
+  // détection en JavaScript pur utilisée en repli.
+  useBarCodeDetectorIfSupported: true,
+  verbose: false
+});
 Html5Qrcode.getCameras().then(cameras => {
   if(cameras && cameras.length){
     const camId = cameras.length > 1 ? cameras[cameras.length - 1].id : cameras[0].id; // souvent la caméra arrière
     scanner.start(
       camId,
-      { fps: 10, qrbox: 240 },
+      {
+        fps: 20, // plus de tentatives de lecture par seconde (était 10)
+        qrbox: { width: 260, height: 260 },
+        aspectRatio: 1.0
+      },
       (decodedText) => verifyRaw(decodedText)
     );
   }
