@@ -409,7 +409,8 @@ function renderTable(){
 function drawTicket(reg){
   return new Promise((resolve) => {
     const canvas = document.getElementById('ticketCanvas');
-    const footerH = 130;
+    const qrSize = 180; // agrandi (était 96) pour un scan plus rapide et fiable
+    const footerH = 130 + (qrSize - 96); // le footer grandit avec le QR
     const w = bgImg.width || 1280;
     const h = bgImg.height || 636;
     canvas.width = w;
@@ -450,18 +451,22 @@ function drawTicket(reg){
     // Le contenu du QR ne porte plus le nom en clair : juste un ID imprévisible
     // (UUID généré côté serveur) + une signature HMAC calculée avec un secret
     // que seul le serveur connaît. Impossible à recréer depuis le "voir le code source".
+    // correctLevel H (haute correction d'erreur) : le QR reste lisible même
+    // partiellement flou, sale, ou pris en photo à un angle — ça accélère
+    // beaucoup le scan en conditions réelles (téléphone qui bouge, mauvaise lumière).
     new QRCode(qrHolder, {
       text: "BRUNCH-PHENIX57|" + reg.ticketId + "|" + reg.signature,
-      width: 96,
-      height: 96,
-      correctLevel: QRCode.CorrectLevel.M
+      width: qrSize,
+      height: qrSize,
+      correctLevel: QRCode.CorrectLevel.H
     });
     setTimeout(() => {
       const qrCanvas = qrHolder.querySelector('canvas');
       if(qrCanvas){
+        const pad = 14;
         ctx.fillStyle = "#fbf5e8";
-        ctx.fillRect(w - 40 - 96 - 10, h + (footerH-96)/2 - 10, 96+20, 96+20);
-        ctx.drawImage(qrCanvas, w - 40 - 96, h + (footerH-96)/2, 96, 96);
+        ctx.fillRect(w - 40 - qrSize - pad, h + (footerH-qrSize)/2 - pad, qrSize+pad*2, qrSize+pad*2);
+        ctx.drawImage(qrCanvas, w - 40 - qrSize, h + (footerH-qrSize)/2, qrSize, qrSize);
       }
       canvas.style.display = 'block';
       document.getElementById('emptyState').style.display = 'none';
