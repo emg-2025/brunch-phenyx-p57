@@ -323,9 +323,6 @@
         <label for="tel">Téléphone</label>
         <input type="tel" id="tel" placeholder="Ex : 07 00 00 00 00" required>
 
-        <label for="email">Email</label>
-        <input type="email" id="email" placeholder="Ex : nom@email.com" required>
-
         <div class="err" id="formErr"></div>
         <button type="submit" class="primary">Générer mon ticket</button>
       </form>
@@ -354,10 +351,10 @@
       <h2>Participants inscrits</h2>
       <table id="regTable">
         <thead>
-          <tr><th>N° Ticket</th><th>Nom</th><th>Téléphone</th><th>Email</th></tr>
+          <tr><th>N° Ticket</th><th>Nom</th><th>Téléphone</th></tr>
         </thead>
         <tbody id="regTableBody">
-          <tr><td colspan="4" style="color:rgba(251,245,232,0.35);">Aucune inscription pour le moment.</td></tr>
+          <tr><td colspan="3" style="color:rgba(251,245,232,0.35);">Aucune inscription pour le moment.</td></tr>
         </tbody>
       </table>
     </div>
@@ -379,11 +376,11 @@ bgImg.src = TICKET_BG;
 // Appelle la fonction serveur (Netlify Function) qui écrit dans Firestore
 // et renvoie un ticketId (UUID), un ticketNo lisible, et une signature HMAC
 // calculée avec un secret qui ne quitte jamais le serveur.
-async function requestTicket(nom, tel, email){
+async function requestTicket(nom, tel){
   const res = await fetch('/.netlify/functions/create-ticket', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ nom, tel, email })
+    body: JSON.stringify({ nom, tel })
   });
   if(!res.ok){
     const errData = await res.json().catch(() => ({}));
@@ -397,7 +394,7 @@ function renderTable(){
   const railCount = document.getElementById('railCount');
   railCount.textContent = registrations.length;
   if(registrations.length === 0){
-    body.innerHTML = '<tr><td colspan="4" style="color:rgba(251,245,232,0.35);">Aucune inscription pour le moment.</td></tr>';
+    body.innerHTML = '<tr><td colspan="3" style="color:rgba(251,245,232,0.35);">Aucune inscription pour le moment.</td></tr>';
     return;
   }
   body.innerHTML = registrations.map(r => `
@@ -405,7 +402,6 @@ function renderTable(){
       <td class="num">${r.ticketNo}</td>
       <td>${r.nom}</td>
       <td>${r.tel}</td>
-      <td>${r.email}</td>
     </tr>
   `).join('');
 }
@@ -447,7 +443,7 @@ function drawTicket(reg){
     ctx.fillText(reg.nom, 40, h + 68);
     ctx.font = "500 15px 'Work Sans', sans-serif";
     ctx.fillStyle = "rgba(251,245,232,0.6)";
-    ctx.fillText(reg.tel + "  ·  " + reg.email, 40, h + 96);
+    ctx.fillText(reg.tel, 40, h + 96);
 
     const qrHolder = document.getElementById('qr-render');
     qrHolder.innerHTML = '';
@@ -479,13 +475,12 @@ document.getElementById('regForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const nom = document.getElementById('nom').value.trim();
   const tel = document.getElementById('tel').value.trim();
-  const email = document.getElementById('email').value.trim();
   const errBox = document.getElementById('formErr');
   const submitBtn = e.target.querySelector('button[type="submit"]');
   errBox.textContent = '';
 
-  if(!nom || !tel || !email){
-    errBox.textContent = "Merci de renseigner les trois champs.";
+  if(!nom || !tel){
+    errBox.textContent = "Merci de renseigner les deux champs.";
     return;
   }
 
@@ -493,8 +488,8 @@ document.getElementById('regForm').addEventListener('submit', async (e) => {
   submitBtn.textContent = "Génération en cours…";
 
   try{
-    const { ticketId, ticketNo, signature } = await requestTicket(nom, tel, email);
-    const reg = { ticketId, ticketNo, signature, nom, tel, email, sent: false };
+    const { ticketId, ticketNo, signature } = await requestTicket(nom, tel);
+    const reg = { ticketId, ticketNo, signature, nom, tel, sent: false };
     registrations.push(reg);
     renderTable();
 
