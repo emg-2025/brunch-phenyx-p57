@@ -19,9 +19,11 @@ if (!admin.apps.length) {
 
 const db = admin.firestore();
 
+const DELIM = ';'; // Excel en français attend ; comme séparateur — , casse la mise en colonnes
+
 function csvEscape(value) {
   const str = String(value ?? '');
-  if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+  if (str.includes(DELIM) || str.includes('"') || str.includes('\n')) {
     return '"' + str.replace(/"/g, '""') + '"';
   }
   return str;
@@ -41,7 +43,8 @@ exports.handler = async (event) => {
   const snapshot = await db.collection('tickets').orderBy('createdAt', 'asc').get();
 
   const rows = [
-    ['N° Ticket', 'Nom', 'Téléphone', 'Utilisé', "Date d'inscription"].map(csvEscape).join(','),
+    'sep=' + DELIM, // indice explicite pour Excel, au cas où le séparateur régional diffère encore
+    ['N° Ticket', 'Nom', 'Téléphone', 'Utilisé', "Date d'inscription"].map(csvEscape).join(DELIM),
   ];
 
   snapshot.forEach((doc) => {
@@ -53,7 +56,7 @@ exports.handler = async (event) => {
       d.tel,
       d.used ? 'Oui' : 'Non',
       createdAt,
-    ].map(csvEscape).join(','));
+    ].map(csvEscape).join(DELIM));
   });
 
   const csv = '\uFEFF' + rows.join('\n'); // \uFEFF = BOM, pour qu'Excel affiche bien les accents
