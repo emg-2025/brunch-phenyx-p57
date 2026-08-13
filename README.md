@@ -1,56 +1,38 @@
-# Brunch Phénix 57 — billetterie sécurisée
+# Paiya de la Gloire 4 — Billetterie EMG
 
-## Ce qui a changé par rapport à la version "démo"
+Adapté de la billetterie Brunch Phénix 57 (même architecture sécurisée), pour l'événement Excellence Médicale Groupe du samedi 12 septembre à VRIDI.
 
-| Avant | Maintenant |
-|---|---|
-| Ticket généré et "validé" entièrement dans le navigateur | Le ticket n'existe que s'il a été créé par `create-ticket.js`, qui écrit dans Firestore |
-| Numéro séquentiel prévisible (`PHX57-0001`) devinable | Le numéro reste affiché pour lisibilité, mais l'authentification repose sur un **UUID + signature HMAC**, pas sur ce numéro |
-| QR = texte brut recopiable (`voir le code source`) | QR = `ticketId + signature HMAC` calculée avec un secret que le navigateur ne voit jamais |
-| Aucun contrôle à l'entrée | `control.html` scanne, vérifie la signature, vérifie l'existence en base, et marque "utilisé" de façon atomique (impossible de réutiliser un ticket, même avec deux scans simultanés) |
+## Ce qui est spécifique à cet événement
 
-## Architecture
+- **Deux types de ticket** : EMG (12 000 F) et Hors EMG (15 000 F) — le prix est déterminé côté serveur à partir du type choisi, jamais confié au navigateur.
+- **Deux visuels** intégrés directement dans `index.html` (`Ticket EMG` / `Ticket HORS EMG`), générés à partir de votre affiche originale.
+- **Numérotation** : `PG4-0001`, `PG4-0002`... (compteur Firestore séparé de l'ancien événement).
+- **QR signé** : contenu `PAIYA-GLOIRE-4|<ticketId>|<signature>`.
+
+## Architecture (identique au Brunch Phénix 57)
 
 ```
-index.html        → formulaire d'inscription (design conservé), appelle create-ticket
-control.html       → scan à l'entrée, appelle verify-ticket
+index.html        → formulaire d'inscription + génération du ticket (2 visuels embarqués)
+control.html       → scan à l'entrée, affiche aussi le type de ticket (EMG / Hors EMG)
 netlify/functions/
-  create-ticket.js → écrit le ticket dans Firestore, renvoie {ticketId, ticketNo, signature}
-  verify-ticket.js → vérifie signature + statut, marque "used" en transaction
+  create-ticket.js → écrit le ticket dans Firestore, détermine le prix selon le type
+  verify-ticket.js → vérifie signature + statut, marque "used"
+  export-tickets.js → export CSV (avec colonnes Type, Montant, et totaux EMG/Hors EMG)
 firestore.rules    → bloque tout accès direct depuis le navigateur
 ```
 
-## Mise en place (≈15-20 min)
+## Mise en place
 
-### 1. Firebase
-1. Créez (ou réutilisez) un projet Firebase, activez **Firestore**.
-2. Dans *Paramètres du projet → Comptes de service*, générez une **clé privée** (fichier JSON).
-3. Notez `project_id`, `client_email`, `private_key` de ce fichier — ils vont dans les variables d'environnement, jamais dans le code.
-4. Déployez `firestore.rules` : `firebase deploy --only firestore:rules` (ou collez-les dans la console Firebase).
+**Vous pouvez réutiliser le même projet Firebase et les mêmes variables d'environnement Netlify** que pour le Brunch Phénix 57 (`FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`, `TICKET_HMAC_SECRET`, `ADMIN_EXPORT_SECRET`) — les tickets des deux événements resteront séparés dans Firestore (compteurs et champ `event` différents), donc pas de conflit.
 
-### 2. Variables d'environnement Netlify
-Dans *Site settings → Environment variables*, ajoutez :
+Sinon, suivez les mêmes étapes que pour le premier événement (voir historique de conversation) :
+1. Créer/réutiliser un dépôt GitHub avec exactement cette structure de fichiers
+2. Connecter Netlify à ce dépôt (Import an existing project → GitHub)
+3. Ajouter les variables d'environnement
+4. Déployer
 
-| Variable | Valeur |
-|---|---|
-| `FIREBASE_PROJECT_ID` | depuis la clé de service |
-| `FIREBASE_CLIENT_EMAIL` | depuis la clé de service |
-| `FIREBASE_PRIVATE_KEY` | depuis la clé de service (gardez les `\n`, Netlify les gère) |
-| `TICKET_HMAC_SECRET` | une chaîne aléatoire longue, ex. générée avec `openssl rand -hex 32` — **à garder secrète, ne jamais la mettre dans index.html ou control.html** |
+## À vérifier avant le jour J
 
-### 3. Déploiement
-```bash
-npm install
-netlify deploy --prod
-```
-Netlify détecte automatiquement `netlify/functions/` et déploie les deux fonctions.
-
-### 4. Le jour J
-- Les invités s'inscrivent sur `index.html`, téléchargent leur PDF (identique visuellement à avant).
-- À l'entrée, ouvrez `control.html` sur un téléphone/tablette : la caméra scanne, l'écran affiche ✅ valide / ⚠️ déjà utilisé / ❌ refusé.
-- Un ticket scanné une fois ne peut plus être réutilisé, même en cas de copie du PDF.
-
-## Ce qui reste volontairement simple (à ajouter si besoin plus tard)
-- Envoi d'email réel (actuellement bouton simulé) — ajoutable avec une fonction Netlify + un service comme Resend/SendGrid.
-- Lien avec un paiement confirmé (Wave, CinetPay) avant délivrance du ticket.
-- Export CSV des inscriptions depuis Firestore pour la liste imprimée de secours.
+- Testez un ticket EMG **et** un ticket Hors EMG pour confirmer que les deux visuels et prix s'affichent correctement
+- Testez le scan avec `control.html` sur le lieu de l'événement (VRIDI) pour valider la connexion internet
+- Téléchargez le CSV la veille (il inclut maintenant les totaux par type de ticket) comme filet de sécurité papier
