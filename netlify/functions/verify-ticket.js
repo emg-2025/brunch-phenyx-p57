@@ -50,10 +50,10 @@ exports.handler = async (event) => {
     return { statusCode: 400, body: JSON.stringify({ status: 'error', message: 'Requête invalide.' }) };
   }
 
-  // Le contenu brut scanné est "BRUNCH-PHENIX57|<ticketId>|<signature>"
+  // Le contenu brut scanné est "PAIYA-GLOIRE-4|<ticketId>|<signature>"
   const raw = (payload.raw || '').trim();
   const parts = raw.split('|');
-  if (parts.length !== 3 || parts[0] !== 'BRUNCH-PHENIX57') {
+  if (parts.length !== 3 || parts[0] !== 'PAIYA-GLOIRE-4') {
     return { statusCode: 200, body: JSON.stringify({ status: 'invalid', message: 'QR non reconnu (mauvais format).' }) };
   }
   const [, ticketId, signature] = parts;
@@ -78,13 +78,14 @@ exports.handler = async (event) => {
           message: `Déjà scanné le ${data.usedAt ? data.usedAt.toDate().toLocaleString('fr-FR') : ''}.`,
           nom: data.nom,
           ticketNo: data.ticketNo,
+          typeLabel: data.typeLabel,
         };
       }
       tx.update(ticketRef, {
         used: true,
         usedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
-      return { status: 'ok', message: 'Ticket valide — accès autorisé.', nom: data.nom, ticketNo: data.ticketNo };
+      return { status: 'ok', message: 'Ticket valide — accès autorisé.', nom: data.nom, ticketNo: data.ticketNo, typeLabel: data.typeLabel };
     });
 
     return { statusCode: 200, body: JSON.stringify(result) };
