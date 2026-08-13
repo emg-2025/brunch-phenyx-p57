@@ -26,17 +26,17 @@ if (!admin.apps.length) {
 
 const db = admin.firestore();
 const HMAC_SECRET = process.env.TICKET_HMAC_SECRET; // secret partagé serveur uniquement
-const EVENT_TAG = 'BRUNCH-PHENIX57';
+const EVENT_TAG = 'PAIYA-GLOIRE-4';
 
 function sign(ticketId) {
   return crypto.createHmac('sha256', HMAC_SECRET).update(ticketId).digest('hex').slice(0, 24);
 }
 
-// Compteur atomique pour le numéro lisible (PHX57-0001, 0002, ...)
+// Compteur atomique pour le numéro lisible (PG4-0001, 0002, ...)
 // Séparé de l'ID réel du ticket : ce numéro est juste un affichage humain,
 // jamais utilisé seul pour authentifier quoi que ce soit.
 async function nextDisplayNumber() {
-  const counterRef = db.collection('_counters').doc('brunch-phenix57');
+  const counterRef = db.collection('_counters').doc('paiya-gloire-4');
   return db.runTransaction(async (tx) => {
     const doc = await tx.get(counterRef);
     const raw = doc.exists ? doc.data().value : 0;
@@ -49,6 +49,14 @@ async function nextDisplayNumber() {
     return next;
   });
 }
+
+// Le prix est déterminé ICI, côté serveur, à partir du type — jamais confié
+// au client. Comme ça, personne ne peut se générer un ticket "12k" en
+// trafiquant la requête alors qu'il a choisi "Hors EMG" dans le formulaire.
+const TYPE_PRICES = {
+  emg: { label: 'Ticket EMG', amount: 12000 },
+  hors: { label: 'Ticket Hors EMG', amount: 15000 },
+};
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
@@ -68,9 +76,13 @@ exports.handler = async (event) => {
 
   const nom = (payload.nom || '').trim();
   const tel = (payload.tel || '').trim();
+  const type = (payload.type || '').trim();
 
   if (!nom || !tel) {
     return { statusCode: 400, body: JSON.stringify({ error: 'Nom et téléphone sont requis.' }) };
+  }
+  if (!TYPE_PRICES[type]) {
+    return { statusCode: 400, body: JSON.stringify({ error: 'Type de ticket invalide.' }) };
   }
   // Validation basique — à muscler si besoin (limite de longueur, etc.)
   if (nom.length > 120 || tel.length > 40) {
@@ -80,13 +92,17 @@ exports.handler = async (event) => {
   const ticketId = randomUUID();
   const signature = sign(ticketId);
   const displayNumber = await nextDisplayNumber();
-  const ticketNo = 'PHX57-' + String(displayNumber).padStart(4, '0');
+  const ticketNo = 'PG4-' + String(displayNumber).padStart(4, '0');
+  const { label: typeLabel, amount: priceAmount } = TYPE_PRICES[type];
 
   await db.collection('tickets').doc(ticketId).set({
     ticketId,
     ticketNo,
     nom,
     tel,
+    type,
+    typeLabel,
+    priceAmount,
     signature,
     used: false,
     usedAt: null,
@@ -96,6 +112,6 @@ exports.handler = async (event) => {
 
   return {
     statusCode: 200,
-    body: JSON.stringify({ ticketId, ticketNo, signature }),
+    body: JSON.stringify({ ticketId, ticketNo, signature, type, typeLabel, priceAmount }),
   };
 };
