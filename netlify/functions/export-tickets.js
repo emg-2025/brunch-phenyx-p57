@@ -44,20 +44,28 @@ exports.handler = async (event) => {
 
   const rows = [
     'sep=' + DELIM, // indice explicite pour Excel, au cas où le séparateur régional diffère encore
-    ['N° Ticket', 'Nom', 'Téléphone', 'Utilisé', "Date d'inscription"].map(csvEscape).join(DELIM),
+    ['N° Ticket', 'Nom', 'Téléphone', 'Type', 'Montant', 'Utilisé', "Date d'inscription"].map(csvEscape).join(DELIM),
   ];
+
+  let totalEmg = 0, totalHors = 0;
 
   snapshot.forEach((doc) => {
     const d = doc.data();
     const createdAt = d.createdAt && d.createdAt.toDate ? d.createdAt.toDate().toLocaleString('fr-FR') : '';
+    if (d.type === 'emg') totalEmg++; else if (d.type === 'hors') totalHors++;
     rows.push([
       d.ticketNo,
       d.nom,
       d.tel,
+      d.typeLabel || d.type || '',
+      d.priceAmount != null ? d.priceAmount + ' F' : '',
       d.used ? 'Oui' : 'Non',
       createdAt,
     ].map(csvEscape).join(DELIM));
   });
+
+  rows.push(''); // ligne vide de séparation
+  rows.push(['', `Total EMG : ${totalEmg}`, `Total Hors EMG : ${totalHors}`, `Total : ${totalEmg + totalHors}`].map(csvEscape).join(DELIM));
 
   const csv = '\uFEFF' + rows.join('\n'); // \uFEFF = BOM, pour qu'Excel affiche bien les accents
 
@@ -65,7 +73,7 @@ exports.handler = async (event) => {
     statusCode: 200,
     headers: {
       'Content-Type': 'text/csv; charset=utf-8',
-      'Content-Disposition': 'attachment; filename="inscrits-brunch-phenix-57.csv"',
+      'Content-Disposition': 'attachment; filename="inscrits-paiya-gloire-4.csv"',
     },
     body: csv,
   };
