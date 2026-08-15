@@ -32,22 +32,22 @@ function sign(ticketId) {
   return crypto.createHmac('sha256', HMAC_SECRET).update(ticketId).digest('hex').slice(0, 24);
 }
 
-// Compteur atomique pour le numéro lisible (PG4-0001, 0002, ...)
-// Séparé de l'ID réel du ticket : ce numéro est juste un affichage humain,
-// jamais utilisé seul pour authentifier quoi que ce soit.
-async function nextDisplayNumber() {
-  const counterRef = db.collection('_counters').doc('paiya-gloire-4');
-  return db.runTransaction(async (tx) => {
-    const doc = await tx.get(counterRef);
-    const raw = doc.exists ? doc.data().value : 0;
-    // Filet de sécurité : si la valeur stockée n'est pas un nombre valide
-    // (champ corrompu, créé manuellement dans la console sans valeur, etc.),
-    // on repart de 0 plutôt que de propager NaN indéfiniment.
-    const current = (typeof raw === 'number' && Number.isFinite(raw)) ? raw : 0;
-    const next = current + 1;
-    tx.set(counterRef, { value: next }, { merge: true });
-    return next;
-  });
+// Numéro lisible ALÉATOIRE (ex. PG4-483920) plutôt que séquentiel — plus
+// difficile à deviner d'un ticket à l'autre, et visuellement plus marquant
+// sur le visuel. Ce numéro reste un simple affichage humain, jamais utilisé
+// seul pour authentifier quoi que ce soit (l'UUID + signature s'en chargent).
+// On vérifie l'unicité en base pour éviter (même si improbable) deux tickets
+// avec le même numéro affiché.
+async function randomDisplayNumber() {
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const n = crypto.randomInt(100000, 999999); // 6 chiffres
+    const candidate = 'PG4-' + n;
+    const existing = await db.collection('tickets').where('ticketNo', '==', candidate).limit(1).get();
+    if (existing.empty) return candidate;
+  }
+  // Filet de sécurité extrêmement improbable à atteindre : on ajoute un
+  // suffixe basé sur l'heure pour garantir malgré tout l'unicité.
+  return 'PG4-' + crypto.randomInt(100000, 999999) + '-' + Date.now().toString().slice(-4);
 }
 
 // Le prix est déterminé ICI, côté serveur, à partir du type — jamais confié
@@ -91,8 +91,7 @@ exports.handler = async (event) => {
 
   const ticketId = randomUUID();
   const signature = sign(ticketId);
-  const displayNumber = await nextDisplayNumber();
-  const ticketNo = 'PG4-' + String(displayNumber).padStart(4, '0');
+  const ticketNo = await randomDisplayNumber();
   const { label: typeLabel, amount: priceAmount } = TYPE_PRICES[type];
 
   await db.collection('tickets').doc(ticketId).set({
