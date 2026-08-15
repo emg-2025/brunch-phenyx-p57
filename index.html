@@ -202,13 +202,23 @@ function drawTicket(reg){
     ctx.drawImage(bg, 0, 0, w, h);
 
     // --- N° de ticket, en vertical dans la boîte blanche à gauche ---
+    // Grand et ajusté automatiquement pour remplir un maximum la boîte
+    // (numéro aléatoire à 6 chiffres, donc taille variable selon le nombre
+    // réel de caractères une fois le préfixe "PG4-" ajouté).
     ctx.save();
     ctx.translate(LEFT_BOX.x + LEFT_BOX.w/2, LEFT_BOX.y + LEFT_BOX.h/2);
     ctx.rotate(-Math.PI/2);
     ctx.fillStyle = "#14140f";
-    ctx.font = "800 26px 'Poppins', sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
+    let numFontSize = 78;
+    const numMaxWidth = LEFT_BOX.h * 0.92;   // limite en largeur une fois tourné (= hauteur de la boîte)
+    const numMaxHeight = LEFT_BOX.w * 0.82;  // limite en hauteur une fois tourné (= largeur de la boîte)
+    ctx.font = `800 ${numFontSize}px 'Poppins', sans-serif`;
+    while ((ctx.measureText(reg.ticketNo).width > numMaxWidth || numFontSize > numMaxHeight) && numFontSize > 20) {
+      numFontSize -= 2;
+      ctx.font = `800 ${numFontSize}px 'Poppins', sans-serif`;
+    }
     ctx.fillText(reg.ticketNo, 0, 0);
     ctx.restore();
 
